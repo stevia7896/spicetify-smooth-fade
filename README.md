@@ -4,6 +4,8 @@
 
 A Spicetify extension that fades the volume out at the end of each track and back in on the next one. Works on Spotify Free.
 
+![Smooth Fade](preview.png)
+
 ## 为什么需要它
 
 Spotify 的「交叉淡入淡出（Crossfade）」现在只对 Premium 开放。免费账号切歌时会直接硬切。
@@ -22,6 +24,12 @@ Spicetify 扩展运行在 Spotify 的界面层，拿不到音频流，没法让�
 - 跳过广告和播客
 
 ## 安装
+
+### 通过 Spicetify Marketplace
+
+在 Marketplace 的 Extensions 里搜索 **Smooth Fade**，点 Install。
+
+### 手动安装
 
 1. 把 `smoothFade.js` 放进 Spicetify 的 Extensions 文件夹：
    - macOS / Linux：`~/.config/spicetify/Extensions/`

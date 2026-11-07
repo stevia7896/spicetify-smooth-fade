@@ -1,0 +1,11 @@
+{
+  "name": "Smooth Fade",
+  "description": "切歌时自动淡出、淡入，适用于 Spotify Free。Volume fade-out/fade-in between tracks, no Premium crossfade needed.",
+  "preview": "preview.png",
+  "main": "smoothFade.js",
+  "readme": "README.md",
+  "authors": [
+    { "name": "stevia7896", "url": "https://github.com/stevia7896" }
+  ],
+  "tags": ["crossfade", "fade", "playback", "volume"]
+}
