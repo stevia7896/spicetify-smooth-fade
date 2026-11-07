@@ -1,6 +1,6 @@
 // NAME: Smooth Fade
 // AUTHOR: stevia7896
-// VERSION: 1.1.0
+// VERSION: 1.1.1
 // DESCRIPTION: Volume fade-out at the end of each track and fade-in on the next one. Works without Premium crossfade.
 
 (function SmoothFade() {
@@ -17,6 +17,7 @@
     }
 
     const TICK_MS = 100;
+    const SHORTCUT = /Mac/i.test(navigator.platform) ? "Ctrl+Option+F" : "Ctrl+Alt+F";
     const SETTINGS_KEY = "smoothfade:settings";
     const RESTORE_KEY = "smoothfade:restoreVolume"; // user volume saved while a fade is in progress
     const USER_CHANGE_TOLERANCE = 0.05;              // volume drift larger than this = user moved the slider
@@ -157,7 +158,7 @@
         if (f < 1) {
             if (outActive && !announcedFade) {
                 announcedFade = true; // one-time confirmation that fading works
-                toast("Smooth Fade：开始淡出");
+                toast("Smooth Fade: fading out");
             }
             if (lastSet === null) {
                 baseVol = vol; // take control: remember what the user had
@@ -209,17 +210,17 @@
     panel.hidden = true;
     panel.innerHTML = `
         <div class="sf-row"><span class="sf-title">Smooth Fade</span><button class="sf-close" data-sf="close">×</button></div>
-        <label class="sf-row"><span>启用淡入淡出</span><input type="checkbox" data-sf="en"></label>
+        <label class="sf-row"><span>Enable fading</span><input type="checkbox" data-sf="en"></label>
         <div>
-            <div class="sf-row"><span>结尾淡出</span><span class="sf-val" data-sf="out-v"></span></div>
+            <div class="sf-row"><span>Fade out at end</span><span class="sf-val" data-sf="out-v"></span></div>
             <input type="range" data-sf="out" min="${LIMITS.fadeOutSec[0]}" max="${LIMITS.fadeOutSec[1]}" step="0.5">
         </div>
         <div>
-            <div class="sf-row"><span>开头淡入</span><span class="sf-val" data-sf="in-v"></span></div>
+            <div class="sf-row"><span>Fade in at start</span><span class="sf-val" data-sf="in-v"></span></div>
             <input type="range" data-sf="in" min="${LIMITS.fadeInSec[0]}" max="${LIMITS.fadeInSec[1]}" step="0.5">
         </div>
-        <label class="sf-row"><span>同一张专辑连播时不淡出</span><input type="checkbox" data-sf="album"></label>
-        <div class="sf-note">快捷键 Ctrl+Option+F 打开/关闭本面板。淡出过程中拖动音量条，会取消这一首的淡出。</div>`;
+        <label class="sf-row"><span>Keep gapless within an album</span><input type="checkbox" data-sf="album"></label>
+        <div class="sf-note">Press ${SHORTCUT} to toggle this panel. Moving the volume slider during a fade cancels the fade for that track.</div>`;
     document.body.appendChild(panel);
 
     const q = (k) => panel.querySelector(`[data-sf="${k}"]`);
@@ -254,11 +255,11 @@
     // Spicetify entry points: best effort, any of them may silently not render on Spotify 1.3.8.
     const ICON = `<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
         <path d="M1 12h2V4H1v8zm4 2h2V2H5v12zm4-2h2V4H9v8zm4-3h2V7h-2v2z"/></svg>`;
-    const LABEL = "Smooth Fade 淡入淡出设置";
+    const LABEL = "Smooth Fade settings";
     try { if (S.Topbar?.Button) new S.Topbar.Button(LABEL, ICON, toggleSettings); } catch (e) { console.error("[SmoothFade] topbar", e); }
     try { if (S.Playbar?.Button) new S.Playbar.Button(LABEL, ICON, toggleSettings, false, false, true); } catch (e) { console.error("[SmoothFade] playbar", e); }
     try { if (S.Menu?.Item) new S.Menu.Item(LABEL, false, toggleSettings).register(); } catch (e) { console.error("[SmoothFade] menu", e); }
 
-    toast("Smooth Fade 已加载 · Ctrl+Option+F 打开设置");
+    toast(`Smooth Fade loaded · ${SHORTCUT} for settings`);
     console.log("[SmoothFade] loaded", cfg);
 })();
