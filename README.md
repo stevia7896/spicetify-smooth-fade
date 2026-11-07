@@ -2,7 +2,7 @@
 
 A [Spicetify](https://spicetify.app) extension that fades the volume out at the end of each track and back in on the next one, so track changes stop sounding like hard cuts. Works on Spotify Free.
 
-![Smooth Fade](preview.png)
+![Smooth Fade](preview-en.png)
 
 ## Why
 

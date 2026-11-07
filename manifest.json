@@ -1,7 +1,7 @@
 {
   "name": "Smooth Fade",
   "description": "Smooth volume fade-out and fade-in between tracks. Works on Spotify Free, no Premium crossfade needed.",
-  "preview": "preview.png",
+  "preview": "preview-en.png",
   "main": "smoothFade.js",
   "readme": "README.md",
   "authors": [
