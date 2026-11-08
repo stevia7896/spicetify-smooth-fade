@@ -1,6 +1,6 @@
 // NAME: Smooth Fade
 // AUTHOR: stevia7896
-// VERSION: 1.1.1
+// VERSION: 1.1.2
 // DESCRIPTION: Volume fade-out at the end of each track and fade-in on the next one. Works without Premium crossfade.
 
 (function SmoothFade() {
@@ -20,7 +20,12 @@
     const SHORTCUT = /Mac/i.test(navigator.platform) ? "Ctrl+Option+F" : "Ctrl+Alt+F";
     const SETTINGS_KEY = "smoothfade:settings";
     const RESTORE_KEY = "smoothfade:restoreVolume"; // user volume saved while a fade is in progress
-    const USER_CHANGE_TOLERANCE = 0.05;              // volume drift larger than this = user moved the slider
+    // setVolume() is a round trip to Spotify's native core, and getVolume() only updates when the core
+    // reports back, so during a fade getVolume() can show any of our writes from the last few hundred ms.
+    // A reading is "ours" if it matches one of the recent writes; anything else means the user moved the slider.
+    const READBACK_TOLERANCE = 0.02;
+    const WRITE_MEMORY_MS = 2000;
+    const END_LEAD_MS = 300;                         // finish the fade-out this early to absorb setVolume latency
     const PAUSE_RESTORE_MS = 1500;                    // paused/stopped this long mid-fade -> give volume back
 
     const DEFAULTS = { enabled: true, fadeOutSec: 6, fadeInSec: 3, skipSameAlbum: true };
@@ -53,7 +58,7 @@
     // ─── State ──────────────────────────────────────────────────────
     let baseVol = P.getVolume();  // the volume the user chose
     let lastSet = null;           // last volume we wrote (null = not controlling volume)
-    let prevSet = null;           // the write before that (setVolume is async)
+    let recentWrites = [];        // [{ v, t }] writes still possibly in flight
     let fadingOut = false;        // fade-out active on the previous tick
     let armedIn = false;          // current track should fade in
     let suppressUri = null;       // user overrode the fade on this track
@@ -77,14 +82,23 @@
     }
 
     function write(v) {
-        prevSet = lastSet;
+        const now = Date.now();
+        recentWrites = recentWrites.filter((w) => now - w.t < WRITE_MEMORY_MS);
+        recentWrites.push({ v, t: now });
         lastSet = v;
         P.setVolume(v);
     }
 
+    function isOurVolume(vol) {
+        const now = Date.now();
+        if (Math.abs(vol - lastSet) <= READBACK_TOLERANCE) return true;
+        return recentWrites.some((w) => now - w.t < WRITE_MEMORY_MS && Math.abs(vol - w.v) <= READBACK_TOLERANCE);
+    }
+
     function release() {
         if (lastSet !== null) P.setVolume(baseVol);
-        lastSet = prevSet = null;
+        lastSet = null;
+        recentWrites = [];
         S.LocalStorage.set(RESTORE_KEY, "");
     }
 
@@ -97,11 +111,13 @@
         if (typeof vol !== "number" || !Number.isFinite(p) || !Number.isFinite(d)) return;
 
         // User moved the volume slider while we were in control: respect it, stop fading this track.
-        if (lastSet !== null &&
-            Math.abs(vol - lastSet) > USER_CHANGE_TOLERANCE &&
-            (prevSet === null || Math.abs(vol - prevSet) > USER_CHANGE_TOLERANCE)) {
+        if (lastSet !== null && !isOurVolume(vol)) {
             baseVol = vol;
-            lastSet = prevSet = null;
+            // Fade writes sent before we noticed are still in flight and would land after the user's
+            // value; send the user's value again so it ends up last.
+            P.setVolume(vol);
+            lastSet = null;
+            recentWrites = [];
             S.LocalStorage.set(RESTORE_KEY, "");
             suppressUri = uri;
             armedIn = fadingOut = false;
@@ -143,7 +159,7 @@
         let outActive = false;
 
         if (uri !== suppressUri && d > 0) {
-            const remaining = d - p;
+            const remaining = d - p - END_LEAD_MS;
             if (d > outMs * 3 && remaining < outMs && !(cfg.skipSameAlbum && nextIsSameAlbum())) {
                 f = Math.min(f, curve(remaining / outMs));
                 outActive = true;
@@ -173,9 +189,31 @@
         }
     }
 
-    setInterval(() => {
+    const safeTick = () => {
         try { tick(); } catch (e) { console.error("[SmoothFade]", e); }
-    }, TICK_MS);
+    };
+
+    // Spotify's renderer runs with Chromium's default background throttling: when the window is minimized,
+    // hidden or fully covered, page timers drop to once per second, and after ~5 minutes to once per minute,
+    // which can skip the whole fade-out. Timers inside a dedicated Worker are not throttled that way.
+    function startTicker() {
+        let fallback = null;
+        const useInterval = () => { fallback ??= setInterval(safeTick, TICK_MS); };
+        try {
+            const src = `setInterval(() => postMessage(0), ${TICK_MS});`;
+            const worker = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+            worker.onmessage = () => { if (fallback === null) safeTick(); };
+            worker.onerror = (e) => {
+                console.warn("[SmoothFade] worker timer failed, using setInterval", e);
+                worker.terminate();
+                useInterval();
+            };
+        } catch (e) {
+            console.warn("[SmoothFade] worker timer unavailable, using setInterval", e);
+            useInterval();
+        }
+    }
+    startTicker();
 
     // ─── Own UI (no dependency on Spicetify UI helpers, which are partly broken on Spotify 1.3.8) ───
     const style = document.createElement("style");
